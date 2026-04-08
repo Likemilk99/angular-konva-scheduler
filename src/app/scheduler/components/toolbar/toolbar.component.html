@@ -1,11 +1,8 @@
 <div class="toolbar">
   <h2>Airport Driver Scheduler (Konva Demo)</h2>
   <div class="toolbar__actions">
-    <div class="zoom-controls">
-      <button type="button" (click)="zoomOut.emit()" [disabled]="isZoomOutDisabled">-</button>
-      <span>{{ zoomLevel }}m</span>
-      <button type="button" (click)="zoomIn.emit()" [disabled]="isZoomInDisabled">+</button>
-    </div>
+    <span class="tz">Display TZ: {{ timeZone }}</span>
+    <button type="button" (click)="openSettings.emit()">Settings</button>
     <button type="button" (click)="reload.emit()">Reload Mock Data</button>
     <button type="button" (click)="toggleUpdates.emit()">
       {{ updatesPaused ? 'Resume Updates' : 'Pause Updates' }}

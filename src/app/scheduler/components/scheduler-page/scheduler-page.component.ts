@@ -1,9 +1,9 @@
 import { AfterViewInit, ChangeDetectionStrategy, Component, ElementRef, ViewChild } from '@angular/core';
 import { map, tap } from 'rxjs/operators';
-import { Driver, SchedulerEvent, Shift, TimelineWindow, ZoomLevel } from '../../../models/timeline.models';
+import { Driver, SchedulerEvent, SchedulerSettings, Shift, TimelineWindow } from '../../../models/timeline.models';
 import { SchedulerStateService } from '../../../services/scheduler-state.service';
 import { EventDragResult } from '../../renderers/timeline-konva-renderer';
-import { getTimelineZoomConfig, getZoomInLevel, getZoomOutLevel } from '../../utils/timeline-zoom';
+import { getTimelineZoomConfig } from '../../utils/timeline-zoom';
 
 interface SchedulerPageVm {
   loading: boolean;
@@ -12,7 +12,7 @@ interface SchedulerPageVm {
   shifts: Shift[];
   events: SchedulerEvent[];
   timelineWindow: TimelineWindow;
-  zoomLevel: ZoomLevel;
+  settings: SchedulerSettings;
 }
 
 @Component({
@@ -27,6 +27,7 @@ export class SchedulerPageComponent implements AfterViewInit {
   readonly rowHeight = 54;
   private latestVm?: SchedulerPageVm;
   private pendingCenterTimeMs?: number;
+  settingsOpen = false;
 
   readonly vm$ = this.state.state$.pipe(
     map((state) => ({
@@ -36,11 +37,11 @@ export class SchedulerPageComponent implements AfterViewInit {
       shifts: state.shifts,
       events: state.events,
       timelineWindow: state.timelineWindow,
-      zoomLevel: state.zoomLevel
+      settings: state.settings
     })),
     tap((vm) => {
       this.latestVm = vm;
-      this.restoreCenterAfterZoom(vm);
+      this.restoreCenterAfterSettings(vm);
     })
   );
 
@@ -48,7 +49,7 @@ export class SchedulerPageComponent implements AfterViewInit {
 
   ngAfterViewInit(): void {
     if (this.pendingCenterTimeMs && this.latestVm) {
-      this.restoreCenterAfterZoom(this.latestVm);
+      this.restoreCenterAfterSettings(this.latestVm);
     }
   }
 
@@ -60,20 +61,18 @@ export class SchedulerPageComponent implements AfterViewInit {
     this.state.toggleUpdatesPaused();
   }
 
-  zoomIn(): void {
-    if (!this.latestVm || !getZoomInLevel(this.latestVm.zoomLevel)) {
-      return;
-    }
-    this.captureVisibleCenterTime();
-    this.state.zoomIn();
+  openSettings(): void {
+    this.settingsOpen = true;
   }
 
-  zoomOut(): void {
-    if (!this.latestVm || !getZoomOutLevel(this.latestVm.zoomLevel)) {
-      return;
-    }
+  closeSettings(): void {
+    this.settingsOpen = false;
+  }
+
+  applySettings(settings: SchedulerSettings): void {
     this.captureVisibleCenterTime();
-    this.state.zoomOut();
+    this.state.updateSettings(settings);
+    this.settingsOpen = false;
   }
 
   private captureVisibleCenterTime(): void {
@@ -85,12 +84,12 @@ export class SchedulerPageComponent implements AfterViewInit {
 
     const startMs = new Date(vm.timelineWindow.startDateTime).getTime();
     const centerX = container.scrollLeft + container.clientWidth / 2;
-    const pixelsPerMinute = getTimelineZoomConfig(vm.zoomLevel).pixelsPerHour / 60;
+    const pixelsPerMinute = getTimelineZoomConfig(vm.settings.zoomLevel).pixelsPerHour / 60;
     const centerMinutes = centerX / pixelsPerMinute;
     this.pendingCenterTimeMs = startMs + centerMinutes * 60000;
   }
 
-  private restoreCenterAfterZoom(vm: SchedulerPageVm): void {
+  private restoreCenterAfterSettings(vm: SchedulerPageVm): void {
     if (!this.pendingCenterTimeMs) {
       return;
     }
@@ -106,7 +105,7 @@ export class SchedulerPageComponent implements AfterViewInit {
         const endMs = new Date(vm.timelineWindow.endDateTime).getTime();
         const safeCenterTimeMs = Math.min(Math.max(this.pendingCenterTimeMs ?? startMs, startMs), endMs);
         const minutesFromStart = (safeCenterTimeMs - startMs) / 60000;
-        const pixelsPerMinute = getTimelineZoomConfig(vm.zoomLevel).pixelsPerHour / 60;
+        const pixelsPerMinute = getTimelineZoomConfig(vm.settings.zoomLevel).pixelsPerHour / 60;
         const targetCenterX = minutesFromStart * pixelsPerMinute;
         const maxScrollLeft = Math.max(0, container.scrollWidth - container.clientWidth);
         const targetScrollLeft = Math.min(Math.max(0, targetCenterX - container.clientWidth / 2), maxScrollLeft);

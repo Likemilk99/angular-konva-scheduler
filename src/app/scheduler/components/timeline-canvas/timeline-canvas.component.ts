@@ -15,6 +15,7 @@ import {
   ViewChild
 } from '@angular/core';
 import { Driver, HOLD_ROW_ID, SchedulerEvent, Shift, TimelineWindow, ZoomLevel } from '../../../models/timeline.models';
+import { SchedulerTimeService } from '../../../services/scheduler-time.service';
 import { EventDragResult, EventHoverPayload, TimelineKonvaRenderer } from '../../renderers/timeline-konva-renderer';
 import { TimelineScale } from '../../utils/timeline-scale';
 
@@ -28,13 +29,13 @@ export class TimelineCanvasComponent implements AfterViewInit, OnChanges, OnDest
   private static readonly HEADER_HEIGHT = 40;
   private static readonly TOOLTIP_WIDTH = 340;
   private static readonly TOOLTIP_HEIGHT = 220;
-  private static readonly PIXELS_PER_MINUTE = 2;
 
   @Input() drivers: Driver[] = [];
   @Input() events: SchedulerEvent[] = [];
   @Input() shifts: Shift[] = [];
   @Input() timelineWindow!: TimelineWindow;
   @Input() zoomLevel: ZoomLevel = 60;
+  @Input() timeZone = 'UTC';
   @Input() rowHeight = 54;
   @Output() eventDragged = new EventEmitter<EventDragResult>();
 
@@ -55,7 +56,8 @@ export class TimelineCanvasComponent implements AfterViewInit, OnChanges, OnDest
 
   constructor(
     private readonly zone: NgZone,
-    private readonly cdr: ChangeDetectorRef
+    private readonly cdr: ChangeDetectorRef,
+    private readonly timeService: SchedulerTimeService
   ) {}
 
   ngAfterViewInit(): void {
@@ -90,7 +92,6 @@ export class TimelineCanvasComponent implements AfterViewInit, OnChanges, OnDest
     const scale = new TimelineScale({
       startMs: new Date(this.timelineWindow.startDateTime).getTime(),
       endMs: new Date(this.timelineWindow.endDateTime).getTime(),
-      pixelsPerMinute: TimelineCanvasComponent.PIXELS_PER_MINUTE,
       zoomLevel: this.zoomLevel
     });
 
@@ -120,6 +121,9 @@ export class TimelineCanvasComponent implements AfterViewInit, OnChanges, OnDest
         shifts: this.shifts,
         events: this.events,
         scale,
+        timeZone: this.timeZone,
+        formatTime: (isoDateTime) => this.timeService.formatTime(isoDateTime, this.timeZone),
+        formatDate: (isoDateTime) => this.timeService.formatShortDate(isoDateTime, this.timeZone),
         onDragCommit: (drag) => this.zone.run(() => this.eventDragged.emit(drag)),
         onEventHover: (payload) => this.zone.run(() => this.updateTooltip(payload)),
         onEventHoverEnd: () => this.zone.run(() => this.hideTooltip()),

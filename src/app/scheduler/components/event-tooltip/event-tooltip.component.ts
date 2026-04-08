@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, Input, OnChanges, SimpleChanges } from '@angular/core';
 import { SchedulerEvent } from '../../../models/timeline.models';
+import { SchedulerTimeService } from '../../../services/scheduler-time.service';
 
 interface TooltipRow {
   label?: string;
@@ -29,14 +30,16 @@ interface TooltipViewModel {
 })
 export class EventTooltipComponent implements OnChanges {
   @Input() event?: SchedulerEvent | null;
+  @Input() timeZone = 'UTC';
 
   viewModel?: TooltipViewModel;
 
+  constructor(private readonly timeService: SchedulerTimeService) {}
+
   ngOnChanges(changes: SimpleChanges): void {
-    if (!('event' in changes)) {
-      return;
+    if ('event' in changes || 'timeZone' in changes) {
+      this.viewModel = this.event ? this.buildViewModel(this.event) : undefined;
     }
-    this.viewModel = this.event ? this.buildViewModel(this.event) : undefined;
   }
 
   private buildViewModel(event: SchedulerEvent): TooltipViewModel {
@@ -53,7 +56,12 @@ export class EventTooltipComponent implements OnChanges {
       assignmentRows.push({ label: 'Gate / Stand', value: [gate, stand].filter(Boolean).join(' / ') });
     }
 
-    const timeRows: TooltipRow[] = [{ label: 'Time', value: `${this.toTime(event.startDateTime)} - ${this.toTime(event.endDateTime)}` }];
+    const timeRows: TooltipRow[] = [
+      {
+        label: 'Time',
+        value: `${this.toTime(event.startDateTime)} - ${this.toTime(event.endDateTime)} (${this.timeZone})`
+      }
+    ];
 
     const route = this.pickFirstString(payload, consumedKeys, ['route', 'originDestination']);
     if (route) {
@@ -103,11 +111,7 @@ export class EventTooltipComponent implements OnChanges {
   }
 
   private toTime(isoDateTime: string): string {
-    return new Date(isoDateTime).toLocaleTimeString([], {
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: false
-    });
+    return this.timeService.formatTime(isoDateTime, this.timeZone);
   }
 
   private humanizeLabel(rawKey: string): string {

@@ -18,18 +18,18 @@ export class MockDataService {
     'locked'
   ];
 
-  createDataset(): {
+  createDataset(timelineWindow?: TimelineWindow): {
     drivers: Driver[];
     shifts: Shift[];
     events: SchedulerEvent[];
     timelineWindow: TimelineWindow;
   } {
-    const timelineWindow = this.createTimelineWindow();
+    const resolvedWindow = timelineWindow ?? this.createTimelineWindow();
     const drivers = this.createDrivers(30);
-    const shifts = this.createShifts(drivers, timelineWindow);
-    const events = this.createEvents(drivers, timelineWindow, 200);
+    const shifts = this.createShifts(drivers, resolvedWindow);
+    const events = this.createEvents(drivers, resolvedWindow, 200);
 
-    return { drivers, shifts, events, timelineWindow };
+    return { drivers, shifts, events, timelineWindow: resolvedWindow };
   }
 
   private createDrivers(total: number): Driver[] {

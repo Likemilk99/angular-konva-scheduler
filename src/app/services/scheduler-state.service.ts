@@ -1,25 +1,46 @@
 import { Injectable, NgZone, OnDestroy } from '@angular/core';
 import { BehaviorSubject, interval, Subscription } from 'rxjs';
-import { Driver, HOLD_ROW_ID, SchedulerEvent, SchedulerState, Shift } from '../models/timeline.models';
-import { getZoomInLevel, getZoomOutLevel } from '../scheduler/utils/timeline-zoom';
+import { Driver, HOLD_ROW_ID, SchedulerEvent, SchedulerSettings, SchedulerState, Shift } from '../models/timeline.models';
 import { MockDataService } from './mock-data.service';
+
+const SETTINGS_STORAGE_KEY = 'scheduler-settings-v1';
+
+const defaultWindowStart = new Date();
+defaultWindowStart.setHours(18, 0, 0, 0);
+const defaultWindowEnd = new Date(defaultWindowStart);
+defaultWindowEnd.setDate(defaultWindowEnd.getDate() + 1);
+defaultWindowEnd.setHours(2, 0, 0, 0);
+
+const DEFAULT_SETTINGS: SchedulerSettings = {
+  zoomLevel: 60,
+  visibleWindow: {
+    startDateTime: defaultWindowStart.toISOString(),
+    endDateTime: defaultWindowEnd.toISOString()
+  },
+  timeZone: 'UTC'
+};
 
 const EMPTY_STATE: SchedulerState = {
   loading: true,
   drivers: [],
   shifts: [],
   events: [],
-  timelineWindow: {
-    startDateTime: new Date().toISOString(),
-    endDateTime: new Date().toISOString()
-  },
+  timelineWindow: DEFAULT_SETTINGS.visibleWindow,
   updatesPaused: false,
-  zoomLevel: 60
+  zoomLevel: DEFAULT_SETTINGS.zoomLevel,
+  settings: DEFAULT_SETTINGS
 };
 
 @Injectable({ providedIn: 'root' })
 export class SchedulerStateService implements OnDestroy {
-  private readonly stateSubject = new BehaviorSubject<SchedulerState>(EMPTY_STATE);
+  private readonly initialSettings = this.loadSettings();
+
+  private readonly stateSubject = new BehaviorSubject<SchedulerState>({
+    ...EMPTY_STATE,
+    settings: this.initialSettings,
+    timelineWindow: this.initialSettings.visibleWindow,
+    zoomLevel: this.initialSettings.zoomLevel
+  });
   readonly state$ = this.stateSubject.asObservable();
 
   private realtimeSub?: Subscription;
@@ -37,12 +58,15 @@ export class SchedulerStateService implements OnDestroy {
     this.stateSubject.next({ ...this.stateSubject.value, loading: true });
 
     setTimeout(() => {
-      const dataset = this.mockData.createDataset();
+      const current = this.stateSubject.value;
+      const dataset = this.mockData.createDataset(current.settings.visibleWindow);
       this.stateSubject.next({
         ...dataset,
         loading: false,
-        updatesPaused: this.stateSubject.value.updatesPaused,
-        zoomLevel: this.stateSubject.value.zoomLevel
+        updatesPaused: current.updatesPaused,
+        zoomLevel: current.settings.zoomLevel,
+        timelineWindow: current.settings.visibleWindow,
+        settings: current.settings
       });
     }, 900);
   }
@@ -52,12 +76,16 @@ export class SchedulerStateService implements OnDestroy {
     this.stateSubject.next({ ...current, updatesPaused: !current.updatesPaused });
   }
 
-  zoomIn(): void {
-    this.updateZoomByStep(1);
-  }
-
-  zoomOut(): void {
-    this.updateZoomByStep(-1);
+  updateSettings(settings: SchedulerSettings): void {
+    const current = this.stateSubject.value;
+    const next = {
+      ...current,
+      settings,
+      zoomLevel: settings.zoomLevel,
+      timelineWindow: settings.visibleWindow
+    };
+    this.stateSubject.next(next);
+    this.persistSettings(settings);
   }
 
   updateEventRow(eventId: string, rowId: string): void {
@@ -130,13 +158,24 @@ export class SchedulerStateService implements OnDestroy {
     return filtered[Math.floor(Math.random() * filtered.length)] ?? current;
   }
 
-  private updateZoomByStep(direction: 1 | -1): void {
-    const current = this.stateSubject.value;
-    const nextLevel = direction === 1 ? getZoomInLevel(current.zoomLevel) : getZoomOutLevel(current.zoomLevel);
-    if (!nextLevel) {
-      return;
+  private loadSettings(): SchedulerSettings {
+    const raw = localStorage.getItem(SETTINGS_STORAGE_KEY);
+    if (!raw) {
+      return DEFAULT_SETTINGS;
     }
 
-    this.stateSubject.next({ ...current, zoomLevel: nextLevel });
+    try {
+      const parsed = JSON.parse(raw) as SchedulerSettings;
+      if (!parsed?.visibleWindow?.startDateTime || !parsed?.visibleWindow?.endDateTime || !parsed.zoomLevel || !parsed.timeZone) {
+        return DEFAULT_SETTINGS;
+      }
+      return parsed;
+    } catch {
+      return DEFAULT_SETTINGS;
+    }
+  }
+
+  private persistSettings(settings: SchedulerSettings): void {
+    localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(settings));
   }
 }
