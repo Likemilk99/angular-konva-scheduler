@@ -1,8 +1,11 @@
 <div class="scheduler-page" *ngIf="vm$ | async as vm">
   <app-scheduler-toolbar
     [updatesPaused]="vm.updatesPaused"
+    [zoomLevel]="vm.zoomLevel"
     (reload)="reload()"
     (toggleUpdates)="toggleUpdates()"
+    (zoomIn)="zoomIn()"
+    (zoomOut)="zoomOut()"
   ></app-scheduler-toolbar>
 
   <div class="loading" *ngIf="vm.loading">Loading mocked schedule...</div>
@@ -10,12 +13,13 @@
   <div class="board-scroll" *ngIf="!vm.loading">
     <app-drivers-panel [drivers]="vm.drivers" [rowHeight]="rowHeight"></app-drivers-panel>
 
-    <div class="timeline-scroll">
+    <div #timelineScroll class="timeline-scroll">
       <app-timeline-canvas
         [drivers]="vm.drivers"
         [shifts]="vm.shifts"
         [events]="vm.events"
         [timelineWindow]="vm.timelineWindow"
+        [zoomLevel]="vm.zoomLevel"
         [rowHeight]="rowHeight"
       ></app-timeline-canvas>
     </div>

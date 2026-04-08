@@ -61,7 +61,7 @@ export class TimelineKonvaRenderer {
     this.eventLayer.destroyChildren();
 
     this.drawGrid(args.rows, args.rowHeight, args.headerHeight, args.timelineWidth);
-    this.drawHourTicks(args.scale, args.headerHeight, args.timelineWidth);
+    this.drawTimelineTicks(args.scale, args.headerHeight, args.timelineWidth);
     this.drawShifts(args, args.rowHeight, args.headerHeight);
     this.drawEvents(args, args.rowHeight, args.headerHeight);
 
@@ -113,14 +113,17 @@ export class TimelineKonvaRenderer {
     });
   }
 
-  private drawHourTicks(scale: TimelineScale, headerHeight: number, width: number): void {
+  private drawTimelineTicks(scale: TimelineScale, headerHeight: number, width: number): void {
     if (!this.gridLayer) {
       return;
     }
 
-    const totalHours = Math.ceil(width / (scale.getTotalWidth() / 8));
-    for (let i = 0; i <= totalHours; i += 1) {
-      const x = i * 60 * 2;
+    const tickIntervalMinutes = scale.getTickIntervalMinutes();
+    const totalMinutes = scale.getTotalMinutes();
+    const totalTicks = Math.ceil(totalMinutes / tickIntervalMinutes);
+
+    for (let i = 0; i <= totalTicks; i += 1) {
+      const x = (i * tickIntervalMinutes * scale.getPixelsPerHour()) / 60;
       this.gridLayer.add(
         new Konva.Line({
           points: [x, 0, x, this.stage?.height() ?? 0],
@@ -129,7 +132,7 @@ export class TimelineKonvaRenderer {
           dash: [2, 2]
         })
       );
-      const labelDate = new Date(scale.xToDateTime(x));
+      const labelDate = new Date(scale.xToTime(x));
       this.gridLayer.add(
         new Konva.Text({
           x: x + 4,

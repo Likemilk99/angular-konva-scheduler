@@ -48,6 +48,8 @@ export interface TimelineWindow {
   endDateTime: string;
 }
 
+export type ZoomLevel = 60 | 30 | 15;
+
 export interface EventVisualModel {
   id: string;
   rowId: string;
@@ -70,6 +72,7 @@ export interface SchedulerState {
   events: SchedulerEvent[];
   timelineWindow: TimelineWindow;
   updatesPaused: boolean;
+  zoomLevel: ZoomLevel;
 }
 
 export const HOLD_ROW_ID = 'HOLD';
