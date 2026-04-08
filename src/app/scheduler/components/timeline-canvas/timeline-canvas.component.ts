@@ -18,6 +18,14 @@ import { Driver, HOLD_ROW_ID, SchedulerEvent, Shift, TimelineWindow, ZoomLevel }
 import { SchedulerTimeService } from '../../../services/scheduler-time.service';
 import { EventDragResult, EventHoverPayload, TimelineKonvaRenderer } from '../../renderers/timeline-konva-renderer';
 import { TimelineScale } from '../../utils/timeline-scale';
+import {
+  computeVisibleTimeRange,
+  filterTimelineItemsByViewport,
+  toVisibleRowIds,
+  ViewportState,
+  VisibleRowRange,
+  VIRTUALIZATION_OVERSCAN
+} from '../../utils/viewport-virtualization';
 
 @Component({
   selector: 'app-timeline-canvas',
@@ -29,6 +37,7 @@ export class TimelineCanvasComponent implements AfterViewInit, OnChanges, OnDest
   private static readonly HEADER_HEIGHT = 40;
   private static readonly TOOLTIP_WIDTH = 340;
   private static readonly TOOLTIP_HEIGHT = 220;
+  private static readonly HORIZONTAL_OVERSCAN_PX = VIRTUALIZATION_OVERSCAN.horizontalPx;
 
   @Input() drivers: Driver[] = [];
   @Input() events: SchedulerEvent[] = [];
@@ -37,20 +46,29 @@ export class TimelineCanvasComponent implements AfterViewInit, OnChanges, OnDest
   @Input() zoomLevel: ZoomLevel = 60;
   @Input() timeZone = 'UTC';
   @Input() rowHeight = 54;
+  @Input() viewport: ViewportState = { scrollLeft: 0, scrollTop: 0, viewportWidth: 0, viewportHeight: 0 };
+  @Input() visibleRowRange: VisibleRowRange = { startIndex: 0, endIndex: -1 };
   @Output() eventDragged = new EventEmitter<EventDragResult>();
 
   @ViewChild('canvasHost') canvasHost?: ElementRef<HTMLDivElement>;
 
   timelineWidth = 960;
   timelineHeight = 300;
+  visibleEventsCount = 0;
+  visibleShiftsCount = 0;
   tooltipState: { visible: boolean; x: number; y: number; event?: SchedulerEvent } = {
     visible: false,
     x: 0,
     y: 0
   };
+
   private ctrlPressed = false;
   private initialized = false;
   private hoveredEventId?: string;
+  private renderRafId?: number;
+  private destroyed = false;
+  private lastMeasuredWidth = 0;
+  private lastMeasuredHeight = 0;
 
   private readonly renderer = new TimelineKonvaRenderer();
 
@@ -61,14 +79,19 @@ export class TimelineCanvasComponent implements AfterViewInit, OnChanges, OnDest
   ) {}
 
   ngAfterViewInit(): void {
-    this.render();
+    this.scheduleRender();
   }
 
   ngOnChanges(_changes: SimpleChanges): void {
-    this.render();
+    this.scheduleRender();
   }
 
   ngOnDestroy(): void {
+    this.destroyed = true;
+    if (this.renderRafId) {
+      cancelAnimationFrame(this.renderRafId);
+      this.renderRafId = undefined;
+    }
     this.renderer.destroy();
     this.initialized = false;
   }
@@ -83,7 +106,18 @@ export class TimelineCanvasComponent implements AfterViewInit, OnChanges, OnDest
     this.ctrlPressed = false;
   }
 
-  private render(): void {
+  private scheduleRender(): void {
+    if (this.renderRafId || this.destroyed) {
+      return;
+    }
+
+    this.renderRafId = requestAnimationFrame(() => {
+      this.renderRafId = undefined;
+      this.zone.runOutsideAngular(() => this.renderFrame());
+    });
+  }
+
+  private renderFrame(): void {
     if (!this.canvasHost?.nativeElement || !this.timelineWindow) {
       return;
     }
@@ -97,39 +131,68 @@ export class TimelineCanvasComponent implements AfterViewInit, OnChanges, OnDest
 
     const width = scale.getTotalWidth();
     const height = TimelineCanvasComponent.HEADER_HEIGHT + rows.length * this.rowHeight;
-
+    const sizeChanged = width !== this.lastMeasuredWidth || height !== this.lastMeasuredHeight;
     this.timelineWidth = width;
     this.timelineHeight = height;
+    this.lastMeasuredWidth = width;
+    this.lastMeasuredHeight = height;
 
-    this.zone.runOutsideAngular(() => {
-      if (!this.initialized) {
-        this.renderer.initialize({
-          container: this.canvasHost?.nativeElement as HTMLDivElement,
-          width,
-          rowHeight: this.rowHeight,
-          headerHeight: TimelineCanvasComponent.HEADER_HEIGHT,
-          scale
-        });
-        this.initialized = true;
-      }
-      this.renderer.render({
+    const visibleRowIds = toVisibleRowIds(rows, this.visibleRowRange);
+    const visibleTimeRange = computeVisibleTimeRange({
+      viewport: this.viewport,
+      timelineWindow: this.timelineWindow,
+      scale,
+      overscanPx: TimelineCanvasComponent.HORIZONTAL_OVERSCAN_PX
+    });
+
+    const filteredItems = filterTimelineItemsByViewport({
+      events: this.events,
+      shifts: this.shifts,
+      visibleRowIds,
+      visibleTimeRange
+    });
+
+    if (!this.initialized) {
+      this.renderer.initialize({
+        container: this.canvasHost?.nativeElement as HTMLDivElement,
+        width,
         rowHeight: this.rowHeight,
         headerHeight: TimelineCanvasComponent.HEADER_HEIGHT,
-        timelineWidth: width,
-        rows,
-        drivers: this.drivers,
-        shifts: this.shifts,
-        events: this.events,
-        scale,
-        timeZone: this.timeZone,
-        formatTime: (isoDateTime) => this.timeService.formatTime(isoDateTime, this.timeZone),
-        formatDate: (isoDateTime) => this.timeService.formatShortDate(isoDateTime, this.timeZone),
-        onDragCommit: (drag) => this.zone.run(() => this.eventDragged.emit(drag)),
-        onEventHover: (payload) => this.zone.run(() => this.updateTooltip(payload)),
-        onEventHoverEnd: () => this.zone.run(() => this.hideTooltip()),
-        isCtrlPressed: () => this.ctrlPressed
+        scale
       });
+      this.initialized = true;
+    }
+
+    this.renderer.render({
+      rowHeight: this.rowHeight,
+      headerHeight: TimelineCanvasComponent.HEADER_HEIGHT,
+      timelineWidth: width,
+      timelineHeight: height,
+      rows,
+      visibleRowRange: this.visibleRowRange,
+      visibleTimeRange,
+      shifts: filteredItems.shifts,
+      events: filteredItems.events,
+      rowLabels: new Map([[HOLD_ROW_ID, 'HOLD'] as [string, string], ...this.drivers.map((d) => [d.id, d.name] as [string, string])]),
+      scale,
+      timeZone: this.timeZone,
+      formatTime: (isoDateTime) => this.timeService.formatTime(isoDateTime, this.timeZone),
+      formatDate: (isoDateTime) => this.timeService.formatShortDate(isoDateTime, this.timeZone),
+      onDragCommit: (drag) => this.zone.run(() => this.eventDragged.emit(drag)),
+      onEventHover: (payload) => this.zone.run(() => this.updateTooltip(payload)),
+      onEventHoverEnd: () => this.zone.run(() => this.hideTooltip()),
+      isCtrlPressed: () => this.ctrlPressed
     });
+
+    if (
+      sizeChanged ||
+      this.visibleEventsCount !== filteredItems.events.length ||
+      this.visibleShiftsCount !== filteredItems.shifts.length
+    ) {
+      this.visibleEventsCount = filteredItems.events.length;
+      this.visibleShiftsCount = filteredItems.shifts.length;
+      this.zone.run(() => this.cdr.markForCheck());
+    }
   }
 
   private updateTooltip(payload: EventHoverPayload): void {

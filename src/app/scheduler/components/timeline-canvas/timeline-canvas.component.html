@@ -1,5 +1,8 @@
 <div class="timeline-wrapper" [style.width.px]="timelineWidth" [style.height.px]="timelineHeight">
   <div #canvasHost class="timeline-stage"></div>
+  <div class="debug-counters">
+    Rows visible {{ visibleRowRange.endIndex - visibleRowRange.startIndex + 1 }} • Events {{ visibleEventsCount }} • Shifts {{ visibleShiftsCount }}
+  </div>
   <app-event-tooltip
     *ngIf="tooltipState.visible && tooltipState.event"
     class="event-tooltip-overlay"

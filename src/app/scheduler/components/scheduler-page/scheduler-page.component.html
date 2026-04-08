@@ -9,10 +9,15 @@
 
   <div class="loading" *ngIf="vm.loading">Loading mocked schedule...</div>
 
-  <div class="board-scroll" *ngIf="!vm.loading">
-    <app-drivers-panel [drivers]="vm.drivers" [rowHeight]="rowHeight"></app-drivers-panel>
+  <div #boardScroll class="board-scroll" *ngIf="!vm.loading" (scroll)="onScroll()">
+    <app-drivers-panel
+      [drivers]="vm.drivers"
+      [rowHeight]="rowHeight"
+      [visibleStartIndex]="visibleRowRange.startIndex"
+      [visibleEndIndex]="visibleRowRange.endIndex"
+    ></app-drivers-panel>
 
-    <div #timelineScroll class="timeline-scroll">
+    <div #timelineScroll class="timeline-scroll" (scroll)="onScroll()">
       <app-timeline-canvas
         [drivers]="vm.drivers"
         [shifts]="vm.shifts"
@@ -21,6 +26,8 @@
         [zoomLevel]="vm.settings.zoomLevel"
         [timeZone]="vm.settings.timeZone"
         [rowHeight]="rowHeight"
+        [viewport]="viewport"
+        [visibleRowRange]="visibleRowRange"
         (eventDragged)="handleEventDragged($event)"
       ></app-timeline-canvas>
     </div>
