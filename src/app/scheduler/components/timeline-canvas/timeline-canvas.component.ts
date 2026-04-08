@@ -28,6 +28,7 @@ export class TimelineCanvasComponent implements AfterViewInit, OnChanges, OnDest
   private static readonly HEADER_HEIGHT = 40;
   private static readonly TOOLTIP_WIDTH = 340;
   private static readonly TOOLTIP_HEIGHT = 220;
+  private static readonly PIXELS_PER_MINUTE = 2;
 
   @Input() drivers: Driver[] = [];
   @Input() events: SchedulerEvent[] = [];
@@ -89,6 +90,7 @@ export class TimelineCanvasComponent implements AfterViewInit, OnChanges, OnDest
     const scale = new TimelineScale({
       startMs: new Date(this.timelineWindow.startDateTime).getTime(),
       endMs: new Date(this.timelineWindow.endDateTime).getTime(),
+      pixelsPerMinute: TimelineCanvasComponent.PIXELS_PER_MINUTE,
       zoomLevel: this.zoomLevel
     });
 

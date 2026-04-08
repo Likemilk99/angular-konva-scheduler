@@ -5,6 +5,7 @@ export interface TimelineScaleConfig {
   startMs: number;
   endMs: number;
   zoomLevel: ZoomLevel;
+  pixelsPerMinute:number;
 }
 
 export class TimelineScale {
