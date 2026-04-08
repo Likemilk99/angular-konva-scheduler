@@ -78,7 +78,7 @@ export class TimelineCanvasComponent implements AfterViewInit, OnChanges, OnDest
     const scale = new TimelineScale({
       startMs: new Date(this.timelineWindow.startDateTime).getTime(),
       endMs: new Date(this.timelineWindow.endDateTime).getTime(),
-      pixelsPerMinute: TimelineCanvasComponent.PIXELS_PER_MINUTE
+      pixelsPerMinute: TimelineCanvasComponent.PIXELS_PER_MINUTE,
       zoomLevel: this.zoomLevel
     });
 
