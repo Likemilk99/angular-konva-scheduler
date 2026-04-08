@@ -2,6 +2,7 @@ import { AfterViewInit, ChangeDetectionStrategy, Component, ElementRef, ViewChil
 import { map, tap } from 'rxjs/operators';
 import { Driver, SchedulerEvent, Shift, TimelineWindow, ZoomLevel } from '../../../models/timeline.models';
 import { SchedulerStateService } from '../../../services/scheduler-state.service';
+import { EventDragResult } from '../../renderers/timeline-konva-renderer';
 import { getTimelineZoomConfig, getZoomInLevel, getZoomOutLevel } from '../../utils/timeline-zoom';
 
 interface SchedulerPageVm {
@@ -113,5 +114,20 @@ export class SchedulerPageComponent implements AfterViewInit {
         this.pendingCenterTimeMs = undefined;
       });
     });
+  }
+
+  handleEventDragged(drag: EventDragResult): void {
+    switch (drag.mode) {
+      case 'assignment':
+        if (drag.rowId) {
+          this.state.updateEventRow(drag.eventId, drag.rowId);
+        }
+        break;
+      case 'time':
+        if (drag.startDateTime && drag.endDateTime) {
+          this.state.shiftEventTime(drag.eventId, drag.startDateTime, drag.endDateTime);
+        }
+        break;
+    }
   }
 }

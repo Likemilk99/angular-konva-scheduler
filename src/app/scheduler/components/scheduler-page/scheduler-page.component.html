@@ -21,6 +21,7 @@
         [timelineWindow]="vm.timelineWindow"
         [zoomLevel]="vm.zoomLevel"
         [rowHeight]="rowHeight"
+        (eventDragged)="handleEventDragged($event)"
       ></app-timeline-canvas>
     </div>
   </div>

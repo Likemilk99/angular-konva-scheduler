@@ -60,6 +60,30 @@ export class SchedulerStateService implements OnDestroy {
     this.updateZoomByStep(-1);
   }
 
+  updateEventRow(eventId: string, rowId: string): void {
+    this.updateEvents((event) => (event.id === eventId ? { ...event, rowId } : event));
+  }
+
+  shiftEventTime(eventId: string, startDateTime: string, endDateTime: string): void {
+    this.updateEvents((event) =>
+      event.id === eventId
+        ? {
+            ...event,
+            startDateTime,
+            endDateTime
+          }
+        : event
+    );
+  }
+
+  private updateEvents(mapper: (event: SchedulerEvent) => SchedulerEvent): void {
+    const current = this.stateSubject.value;
+    this.stateSubject.next({
+      ...current,
+      events: current.events.map(mapper)
+    });
+  }
+
   private startRealtimeUpdates(): void {
     this.zone.runOutsideAngular(() => {
       this.realtimeSub = interval(4000).subscribe(() => {
