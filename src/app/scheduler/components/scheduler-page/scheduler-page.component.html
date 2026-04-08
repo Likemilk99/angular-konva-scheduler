@@ -1,11 +1,10 @@
 <div class="scheduler-page" *ngIf="vm$ | async as vm">
   <app-scheduler-toolbar
     [updatesPaused]="vm.updatesPaused"
-    [zoomLevel]="vm.zoomLevel"
+    [timeZone]="vm.settings.timeZone"
     (reload)="reload()"
     (toggleUpdates)="toggleUpdates()"
-    (zoomIn)="zoomIn()"
-    (zoomOut)="zoomOut()"
+    (openSettings)="openSettings()"
   ></app-scheduler-toolbar>
 
   <div class="loading" *ngIf="vm.loading">Loading mocked schedule...</div>
@@ -19,10 +18,18 @@
         [shifts]="vm.shifts"
         [events]="vm.events"
         [timelineWindow]="vm.timelineWindow"
-        [zoomLevel]="vm.zoomLevel"
+        [zoomLevel]="vm.settings.zoomLevel"
+        [timeZone]="vm.settings.timeZone"
         [rowHeight]="rowHeight"
         (eventDragged)="handleEventDragged($event)"
       ></app-timeline-canvas>
     </div>
   </div>
+
+  <app-settings-modal
+    *ngIf="settingsOpen"
+    [settings]="vm.settings"
+    (close)="closeSettings()"
+    (save)="applySettings($event)"
+  ></app-settings-modal>
 </div>

@@ -26,34 +26,12 @@
     border-radius: 4px;
     padding: 6px 10px;
     cursor: pointer;
-
-    &:disabled {
-      opacity: 0.45;
-      cursor: not-allowed;
-    }
   }
 }
 
-.zoom-controls {
-  display: inline-flex;
-  align-items: center;
-  border: 1px solid #8aa0bb;
-  border-radius: 4px;
-  background: #f8fafc;
-
-  button {
-    border: 0;
-    border-radius: 0;
-    min-width: 32px;
-    padding: 6px 8px;
-    background: transparent;
-  }
-
-  span {
-    min-width: 42px;
-    text-align: center;
-    font-size: 13px;
-    font-weight: 600;
-    color: #334155;
-  }
+.tz {
+  font-size: 13px;
+  color: #334155;
+  font-weight: 600;
+  padding-right: 4px;
 }

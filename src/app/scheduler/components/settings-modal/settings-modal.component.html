@@ -1,0 +1,42 @@
+<div class="settings-backdrop" (click)="close.emit()"></div>
+<div class="settings-modal" role="dialog" aria-modal="true" aria-label="Scheduler Settings">
+  <header>
+    <h3>Scheduler Settings</h3>
+  </header>
+
+  <section *ngIf="form as f">
+    <div class="field-group">
+      <label>Timeline Detail / Zoom</label>
+      <div class="zoom-row">
+        <label *ngFor="let option of zoomOptions">
+          <input type="radio" name="zoomLevel" [value]="option" [(ngModel)]="f.zoomLevel" />
+          {{ option }} min
+        </label>
+      </div>
+    </div>
+
+    <div class="field-group">
+      <label>Visible DateTime Window</label>
+      <div class="grid">
+        <label>Start Date <input type="date" [(ngModel)]="f.startDate" /></label>
+        <label>Start Time <input type="time" [(ngModel)]="f.startTime" /></label>
+        <label>End Date <input type="date" [(ngModel)]="f.endDate" /></label>
+        <label>End Time <input type="time" [(ngModel)]="f.endTime" /></label>
+      </div>
+    </div>
+
+    <div class="field-group">
+      <label for="tz">Time Zone</label>
+      <select id="tz" [(ngModel)]="f.timeZone">
+        <option *ngFor="let tz of timeZones" [value]="tz">{{ tz }}</option>
+      </select>
+    </div>
+
+    <p class="error" *ngIf="validationError">{{ validationError }}</p>
+  </section>
+
+  <footer>
+    <button type="button" class="secondary" (click)="close.emit()">Cancel</button>
+    <button type="button" (click)="onSave()">Apply</button>
+  </footer>
+</div>

@@ -5,7 +5,6 @@ export interface TimelineScaleConfig {
   startMs: number;
   endMs: number;
   zoomLevel: ZoomLevel;
-  pixelsPerMinute:number;
 }
 
 export class TimelineScale {
@@ -16,27 +15,38 @@ export class TimelineScale {
   constructor(private readonly config: TimelineScaleConfig) {
     this.zoomConfig = getTimelineZoomConfig(config.zoomLevel);
     this.totalMinutes = (config.endMs - config.startMs) / 60000;
-    this.pixelsPerMinute = this.getPixelsPerHour() / 60;
+    this.pixelsPerMinute = this.zoomConfig.pixelsPerHour / 60;
+  }
+
+  timeMsToX(timeMs: number): number {
+    const minutesFromStart = (timeMs - this.config.startMs) / 60000;
+    return minutesFromStart * this.pixelsPerMinute;
   }
 
   timeToX(datetime: string): number {
-    const minutesFromStart = (new Date(datetime).getTime() - this.config.startMs) / 60000;
-    return minutesFromStart * this.pixelsPerMinute;
+    return this.timeMsToX(new Date(datetime).getTime());
   }
 
   datetimeToX(datetime: string): number {
     return this.timeToX(datetime);
   }
 
-  durationToWidth(startDateTime: string, endDateTime: string): number {
-    const diffMinutes =
-      (new Date(endDateTime).getTime() - new Date(startDateTime).getTime()) / 60000;
+  durationMsToWidth(startMs: number, endMs: number): number {
+    const diffMinutes = (endMs - startMs) / 60000;
     return diffMinutes * this.pixelsPerMinute;
   }
 
-  xToTime(x: number): string {
+  durationToWidth(startDateTime: string, endDateTime: string): number {
+    return this.durationMsToWidth(new Date(startDateTime).getTime(), new Date(endDateTime).getTime());
+  }
+
+  xToTimeMs(x: number): number {
     const minutes = x / this.pixelsPerMinute;
-    return new Date(this.config.startMs + minutes * 60000).toISOString();
+    return this.config.startMs + minutes * 60000;
+  }
+
+  xToTime(x: number): string {
+    return new Date(this.xToTimeMs(x)).toISOString();
   }
 
   xToDateTime(x: number): string {
@@ -44,7 +54,7 @@ export class TimelineScale {
   }
 
   snapX(x: number, snapMinutes: number): number {
-    const snapWidth = snapMinutes * this.config.pixelsPerMinute;
+    const snapWidth = snapMinutes * this.pixelsPerMinute;
     if (snapWidth <= 0) {
       return x;
     }
@@ -52,7 +62,7 @@ export class TimelineScale {
   }
 
   getPixelsPerMinute(): number {
-    return this.config.pixelsPerMinute;
+    return this.pixelsPerMinute;
   }
 
   getStartMs(): number {

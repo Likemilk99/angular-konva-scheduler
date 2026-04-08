@@ -4,6 +4,7 @@
     *ngIf="tooltipState.visible && tooltipState.event"
     class="event-tooltip-overlay"
     [event]="tooltipState.event"
+    [timeZone]="timeZone"
     [style.left.px]="tooltipState.x"
     [style.top.px]="tooltipState.y"
   ></app-event-tooltip>

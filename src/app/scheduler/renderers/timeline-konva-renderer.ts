@@ -67,6 +67,9 @@ export class TimelineKonvaRenderer {
   private onEventHover?: (payload: EventHoverPayload) => void;
   private onEventHoverEnd?: () => void;
   private isCtrlPressed?: () => boolean;
+  private timeZone = 'UTC';
+  private formatTime: (isoDateTime: string) => string = (isoDateTime) => new Date(isoDateTime).toISOString();
+  private formatDate: (isoDateTime: string) => string = (isoDateTime) => new Date(isoDateTime).toISOString();
   private initializedContainer?: HTMLDivElement;
   private lastGridSignature = '';
   private dragPreview?: Konva.Group;
@@ -108,6 +111,9 @@ export class TimelineKonvaRenderer {
     shifts: Shift[];
     events: SchedulerEvent[];
     scale: TimelineScale;
+    timeZone: string;
+    formatTime: (isoDateTime: string) => string;
+    formatDate: (isoDateTime: string) => string;
     onDragCommit: (result: EventDragResult) => void;
     onEventHover: (payload: EventHoverPayload) => void;
     onEventHoverEnd: () => void;
@@ -122,6 +128,9 @@ export class TimelineKonvaRenderer {
     this.headerHeight = args.headerHeight;
     this.timelineWidth = args.timelineWidth;
     this.scale = args.scale;
+    this.timeZone = args.timeZone;
+    this.formatTime = args.formatTime;
+    this.formatDate = args.formatDate;
     this.onDragCommit = args.onDragCommit;
     this.onEventHover = args.onEventHover;
     this.onEventHoverEnd = args.onEventHoverEnd;
@@ -205,6 +214,14 @@ export class TimelineKonvaRenderer {
 
       const model = this.toVisualModel(event, rowIndex, rowHeight, headerHeight, scale);
       const existing = this.eventNodes.get(event.id);
+      if (!model) {
+        existing?.group.destroy();
+        if (existing) {
+          this.eventNodes.delete(event.id);
+        }
+        return;
+      }
+
       if (!existing) {
         const group = this.createEventGroup(model, event.id);
         this.eventLayer?.add(group);
@@ -294,6 +311,7 @@ export class TimelineKonvaRenderer {
     const tickIntervalMinutes = scale.getTickIntervalMinutes();
     const totalMinutes = scale.getTotalMinutes();
     const totalTicks = Math.ceil(totalMinutes / tickIntervalMinutes);
+    let previousDateLabel = '';
 
     for (let i = 0; i <= totalTicks; i += 1) {
       const x = (i * tickIntervalMinutes * scale.getPixelsPerHour()) / 60;
@@ -306,16 +324,31 @@ export class TimelineKonvaRenderer {
         })
       );
 
-      const labelDate = new Date(scale.xToTime(x));
+      const labelIso = scale.xToTime(x);
       this.gridLayer.add(
         new Konva.Text({
           x: x + 4,
-          y: 4,
-          text: labelDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          y: 16,
+          text: this.formatTime(labelIso),
           fontSize: 11,
           fill: '#475569'
         })
       );
+
+      const dateLabel = this.formatDate(labelIso);
+      if (dateLabel !== previousDateLabel) {
+        previousDateLabel = dateLabel;
+        this.gridLayer.add(
+          new Konva.Text({
+            x: x + 4,
+            y: 2,
+            text: dateLabel,
+            fontSize: 11,
+            fill: '#1e293b',
+            fontStyle: 'bold'
+          })
+        );
+      }
     }
 
     this.gridLayer.add(
@@ -333,13 +366,25 @@ export class TimelineKonvaRenderer {
     headerHeight: number
   ): void {
     const rowIndexMap = new Map(args.rows.map((rowId, index) => [rowId, index]));
+    const windowStart = args.scale.getStartMs();
+    const windowEnd = args.scale.getEndMs();
+
     args.shifts.forEach((shift) => {
       const rowIndex = rowIndexMap.get(shift.driverId);
       if (rowIndex === undefined) {
         return;
       }
-      const x = args.scale.datetimeToX(shift.startDateTime);
-      const width = Math.max(8, args.scale.durationToWidth(shift.startDateTime, shift.endDateTime));
+
+      const shiftStart = new Date(shift.startDateTime).getTime();
+      const shiftEnd = new Date(shift.endDateTime).getTime();
+      const clippedStart = Math.max(shiftStart, windowStart);
+      const clippedEnd = Math.min(shiftEnd, windowEnd);
+      if (clippedEnd <= clippedStart) {
+        return;
+      }
+
+      const x = args.scale.timeMsToX(clippedStart);
+      const width = Math.max(1, args.scale.durationMsToWidth(clippedStart, clippedEnd));
       const y = headerHeight + rowIndex * rowHeight + 6;
       this.shiftLayer?.add(
         new Konva.Rect({
@@ -361,9 +406,17 @@ export class TimelineKonvaRenderer {
     rowHeight: number,
     headerHeight: number,
     scale: TimelineScale
-  ): EventVisualModel {
-    const x = scale.datetimeToX(event.startDateTime);
-    const width = Math.max(24, scale.durationToWidth(event.startDateTime, event.endDateTime));
+  ): EventVisualModel | undefined {
+    const eventStart = new Date(event.startDateTime).getTime();
+    const eventEnd = new Date(event.endDateTime).getTime();
+    const clippedStart = Math.max(eventStart, scale.getStartMs());
+    const clippedEnd = Math.min(eventEnd, scale.getEndMs());
+    if (clippedEnd <= clippedStart) {
+      return undefined;
+    }
+
+    const x = scale.timeMsToX(clippedStart);
+    const width = Math.max(2, scale.durationMsToWidth(clippedStart, clippedEnd));
     const y = headerHeight + rowIndex * rowHeight + 9;
     const height = rowHeight - 18;
     const compactLevel = width < 60 ? 'tiny' : width < 140 ? 'compact' : 'full';
@@ -678,7 +731,7 @@ export class TimelineKonvaRenderer {
     const snapMinutes = pixelsPerMinute >= 3 ? 5 : 15;
     const snapped = this.scale.snapX(x, snapMinutes);
     const minX = 0;
-    const maxX = Math.max(0, this.timelineWidth - eventWidth - 12);
+    const maxX = Math.max(0, this.timelineWidth - eventWidth);
     return Math.max(minX, Math.min(maxX, snapped));
   }
 
@@ -732,9 +785,9 @@ export class TimelineKonvaRenderer {
       return 'Move in time';
     }
     const nextEndIso = new Date(new Date(nextStartIso).getTime() + durationMs).toISOString();
-    const startLabel = new Date(nextStartIso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    const endLabel = new Date(nextEndIso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    return `${startLabel} - ${endLabel}`;
+    const startLabel = this.formatTime(nextStartIso);
+    const endLabel = this.formatTime(nextEndIso);
+    return `${startLabel} - ${endLabel} (${this.timeZone})`;
   }
 
   private showDragPreview(text: string, groupX: number, groupY: number, accentColor: string): void {
