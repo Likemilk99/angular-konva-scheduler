@@ -1,0 +1,29 @@
+.toolbar {
+  height: 56px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 12px;
+  background: #ffffff;
+  border-bottom: 1px solid #dbe3ee;
+
+  h2 {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 600;
+  }
+}
+
+.toolbar__actions {
+  display: flex;
+  gap: 8px;
+
+  button {
+    border: 1px solid #8aa0bb;
+    background: #f8fafc;
+    color: #0f172a;
+    border-radius: 4px;
+    padding: 6px 10px;
+    cursor: pointer;
+  }
+}

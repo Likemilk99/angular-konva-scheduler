@@ -1,0 +1,13 @@
+<div class="driver-header">Driver Queue</div>
+<div class="driver-row hold" [style.height.px]="rowHeight">
+  <div>
+    <div class="name">HOLD</div>
+    <div class="meta">Unassigned tasks</div>
+  </div>
+</div>
+<div class="driver-row" *ngFor="let driver of drivers" [style.height.px]="rowHeight">
+  <div>
+    <div class="name">{{ driver.name }}</div>
+    <div class="meta">Score {{ driver.score }} • Trips {{ driver.activeTrips }}</div>
+  </div>
+</div>
