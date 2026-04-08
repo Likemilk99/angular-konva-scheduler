@@ -46,14 +46,11 @@ export class SchedulerStateService implements OnDestroy {
   }
 
   updateEventRow(eventId: string, rowId: string): void {
-    const current = this.stateSubject.value;
-    const updatedEvents = current.events.map((event) => (event.id === eventId ? { ...event, rowId } : event));
-    this.stateSubject.next({ ...current, events: updatedEvents });
+    this.updateEvents((event) => (event.id === eventId ? { ...event, rowId } : event));
   }
 
   shiftEventTime(eventId: string, startDateTime: string, endDateTime: string): void {
-    const current = this.stateSubject.value;
-    const updatedEvents = current.events.map((event) =>
+    this.updateEvents((event) =>
       event.id === eventId
         ? {
             ...event,
@@ -62,7 +59,14 @@ export class SchedulerStateService implements OnDestroy {
           }
         : event
     );
-    this.stateSubject.next({ ...current, events: updatedEvents });
+  }
+
+  private updateEvents(mapper: (event: SchedulerEvent) => SchedulerEvent): void {
+    const current = this.stateSubject.value;
+    this.stateSubject.next({
+      ...current,
+      events: current.events.map(mapper)
+    });
   }
 
   private startRealtimeUpdates(): void {

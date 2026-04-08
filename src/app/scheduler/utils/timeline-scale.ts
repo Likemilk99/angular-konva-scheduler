@@ -27,6 +27,14 @@ export class TimelineScale {
     return new Date(this.config.startMs + minutes * 60000).toISOString();
   }
 
+  snapX(x: number, snapMinutes: number): number {
+    const snapWidth = snapMinutes * this.config.pixelsPerMinute;
+    if (snapWidth <= 0) {
+      return x;
+    }
+    return Math.round(x / snapWidth) * snapWidth;
+  }
+
   getPixelsPerMinute(): number {
     return this.config.pixelsPerMinute;
   }

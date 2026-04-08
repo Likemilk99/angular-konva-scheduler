@@ -33,12 +33,17 @@ export class SchedulerPageComponent {
   }
 
   handleEventDragged(drag: EventDragResult): void {
-    if (drag.mode === 'assignment' && drag.rowId) {
-      this.state.updateEventRow(drag.eventId, drag.rowId);
-      return;
-    }
-    if (drag.mode === 'time' && drag.startDateTime && drag.endDateTime) {
-      this.state.shiftEventTime(drag.eventId, drag.startDateTime, drag.endDateTime);
+    switch (drag.mode) {
+      case 'assignment':
+        if (drag.rowId) {
+          this.state.updateEventRow(drag.eventId, drag.rowId);
+        }
+        break;
+      case 'time':
+        if (drag.startDateTime && drag.endDateTime) {
+          this.state.shiftEventTime(drag.eventId, drag.startDateTime, drag.endDateTime);
+        }
+        break;
     }
   }
 }

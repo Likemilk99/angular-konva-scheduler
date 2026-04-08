@@ -24,6 +24,9 @@ import { TimelineScale } from '../../utils/timeline-scale';
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class TimelineCanvasComponent implements AfterViewInit, OnChanges, OnDestroy {
+  private static readonly HEADER_HEIGHT = 40;
+  private static readonly PIXELS_PER_MINUTE = 2;
+
   @Input() drivers: Driver[] = [];
   @Input() events: SchedulerEvent[] = [];
   @Input() shifts: Shift[] = [];
@@ -74,11 +77,11 @@ export class TimelineCanvasComponent implements AfterViewInit, OnChanges, OnDest
     const scale = new TimelineScale({
       startMs: new Date(this.timelineWindow.startDateTime).getTime(),
       endMs: new Date(this.timelineWindow.endDateTime).getTime(),
-      pixelsPerMinute: 2
+      pixelsPerMinute: TimelineCanvasComponent.PIXELS_PER_MINUTE
     });
 
     const width = scale.getTotalWidth() + 120;
-    const height = 40 + rows.length * this.rowHeight;
+    const height = TimelineCanvasComponent.HEADER_HEIGHT + rows.length * this.rowHeight;
 
     this.timelineWidth = width;
     this.timelineHeight = height;
@@ -89,14 +92,14 @@ export class TimelineCanvasComponent implements AfterViewInit, OnChanges, OnDest
           container: this.canvasHost?.nativeElement as HTMLDivElement,
           width,
           rowHeight: this.rowHeight,
-          headerHeight: 40,
+          headerHeight: TimelineCanvasComponent.HEADER_HEIGHT,
           scale
         });
         this.initialized = true;
       }
       this.renderer.render({
         rowHeight: this.rowHeight,
-        headerHeight: 40,
+        headerHeight: TimelineCanvasComponent.HEADER_HEIGHT,
         timelineWidth: width,
         rows,
         drivers: this.drivers,

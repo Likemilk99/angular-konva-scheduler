@@ -606,8 +606,7 @@ export class TimelineKonvaRenderer {
 
     const pixelsPerMinute = this.scale.getPixelsPerMinute();
     const snapMinutes = pixelsPerMinute >= 3 ? 5 : 15;
-    const snapWidth = snapMinutes * pixelsPerMinute;
-    const snapped = Math.round(x / snapWidth) * snapWidth;
+    const snapped = this.scale.snapX(x, snapMinutes);
     const minX = 0;
     const maxX = Math.max(0, this.timelineWidth - eventWidth - 12);
     return Math.max(minX, Math.min(maxX, snapped));
