@@ -18,6 +18,12 @@ export interface EventDragResult {
   endDateTime?: string;
 }
 
+export interface EventHoverPayload {
+  event: SchedulerEvent;
+  x: number;
+  y: number;
+}
+
 interface DragState {
   eventId: string;
   mode: 'assignment' | 'time';
@@ -58,6 +64,8 @@ export class TimelineKonvaRenderer {
   private scale?: TimelineScale;
   private currentDrag?: DragState;
   private onDragCommit?: (result: EventDragResult) => void;
+  private onEventHover?: (payload: EventHoverPayload) => void;
+  private onEventHoverEnd?: () => void;
   private isCtrlPressed?: () => boolean;
   private initializedContainer?: HTMLDivElement;
   private lastGridSignature = '';
@@ -101,6 +109,8 @@ export class TimelineKonvaRenderer {
     events: SchedulerEvent[];
     scale: TimelineScale;
     onDragCommit: (result: EventDragResult) => void;
+    onEventHover: (payload: EventHoverPayload) => void;
+    onEventHoverEnd: () => void;
     isCtrlPressed: () => boolean;
   }): void {
     if (!this.stage || !this.gridLayer || !this.shiftLayer || !this.eventLayer) {
@@ -113,6 +123,8 @@ export class TimelineKonvaRenderer {
     this.timelineWidth = args.timelineWidth;
     this.scale = args.scale;
     this.onDragCommit = args.onDragCommit;
+    this.onEventHover = args.onEventHover;
+    this.onEventHoverEnd = args.onEventHoverEnd;
     this.isCtrlPressed = args.isCtrlPressed;
     this.rowIndexMap = new Map(args.rows.map((rowId, index) => [rowId, index]));
     this.rowLabelMap = new Map<string, string>([
@@ -392,6 +404,9 @@ export class TimelineKonvaRenderer {
     group.on('dragstart', () => this.handleDragStart(group, eventId));
     group.on('dragmove', () => this.handleDragMove(group));
     group.on('dragend', () => this.handleDragEnd(group, model, eventId));
+    group.on('mouseenter', () => this.handleEventMouseEnter(eventId));
+    group.on('mousemove', () => this.handleEventMouseMove(eventId));
+    group.on('mouseleave', () => this.handleEventMouseLeave(eventId));
 
     const bodyRect = new Konva.Rect({
       name: 'event-body',
@@ -483,6 +498,7 @@ export class TimelineKonvaRenderer {
       originalRowId: event.rowId,
       durationMs: new Date(event.endDateTime).getTime() - new Date(event.startDateTime).getTime()
     };
+    this.onEventHoverEnd?.();
 
     group.opacity(0.9);
     group.moveToTop();
@@ -576,6 +592,60 @@ export class TimelineKonvaRenderer {
     }
 
     this.eventLayer?.batchDraw();
+  }
+
+  private handleEventMouseEnter(eventId: string): void {
+    if (this.currentDrag) {
+      return;
+    }
+    const node = this.eventNodes.get(eventId);
+    if (!node) {
+      return;
+    }
+    const bodyRect = node.group.findOne<Konva.Rect>('.event-body');
+    bodyRect?.setAttrs({
+      strokeWidth: 2,
+      shadowColor: '#0f172a',
+      shadowOpacity: 0.15,
+      shadowBlur: 8,
+      shadowOffset: { x: 0, y: 2 }
+    });
+    this.emitHover(node.event);
+    this.eventLayer?.batchDraw();
+  }
+
+  private handleEventMouseMove(eventId: string): void {
+    if (this.currentDrag) {
+      return;
+    }
+    const event = this.eventNodes.get(eventId)?.event;
+    if (!event) {
+      return;
+    }
+    this.emitHover(event);
+  }
+
+  private handleEventMouseLeave(eventId: string): void {
+    const node = this.eventNodes.get(eventId);
+    const bodyRect = node?.group.findOne<Konva.Rect>('.event-body');
+    bodyRect?.setAttrs({
+      strokeWidth: 1,
+      shadowOpacity: 0
+    });
+    this.onEventHoverEnd?.();
+    this.eventLayer?.batchDraw();
+  }
+
+  private emitHover(event: SchedulerEvent): void {
+    const pointer = this.stage?.getPointerPosition();
+    if (!pointer) {
+      return;
+    }
+    this.onEventHover?.({
+      event,
+      x: pointer.x,
+      y: pointer.y
+    });
   }
 
   private getBoundedPosition(eventId: string, pos: Konva.Vector2d): Konva.Vector2d {

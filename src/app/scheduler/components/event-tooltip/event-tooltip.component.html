@@ -1,0 +1,16 @@
+<ng-container *ngIf="viewModel as vm">
+  <div class="tooltip-header">
+    <div class="tooltip-title">{{ vm.title }}</div>
+    <div class="tooltip-status" [ngClass]="vm.statusClass">{{ vm.statusLabel }}</div>
+  </div>
+
+  <div class="tooltip-subtitle" *ngIf="vm.subtitle">{{ vm.subtitle }}</div>
+
+  <section class="tooltip-section" *ngFor="let section of vm.sections">
+    <div class="section-title" *ngIf="section.title">{{ section.title }}</div>
+    <div class="tooltip-row" *ngFor="let row of section.rows">
+      <div class="row-label" *ngIf="row.label">{{ row.label }}</div>
+      <div class="row-value" [ngClass]="row.valueClass">{{ row.value }}</div>
+    </div>
+  </section>
+</ng-container>
