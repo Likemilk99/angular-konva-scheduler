@@ -43,7 +43,7 @@ export class TimelineScale {
   }
 
   snapX(x: number, snapMinutes: number): number {
-    const snapWidth = snapMinutes * this.config.pixelsPerMinute;
+    const snapWidth = snapMinutes * this.pixelsPerMinute;
     if (snapWidth <= 0) {
       return x;
     }
@@ -51,7 +51,7 @@ export class TimelineScale {
   }
 
   getPixelsPerMinute(): number {
-    return this.config.pixelsPerMinute;
+    return this.pixelsPerMinute;
   }
 
   getStartMs(): number {

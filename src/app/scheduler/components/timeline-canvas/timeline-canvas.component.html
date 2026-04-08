@@ -1,3 +1,10 @@
 <div class="timeline-wrapper" [style.width.px]="timelineWidth" [style.height.px]="timelineHeight">
   <div #canvasHost class="timeline-stage"></div>
+  <app-event-tooltip
+    *ngIf="tooltipState.visible && tooltipState.event"
+    class="event-tooltip-overlay"
+    [event]="tooltipState.event"
+    [style.left.px]="tooltipState.x"
+    [style.top.px]="tooltipState.y"
+  ></app-event-tooltip>
 </div>
