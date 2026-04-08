@@ -27,6 +27,18 @@ export class TimelineScale {
     return new Date(this.config.startMs + minutes * 60000).toISOString();
   }
 
+  getPixelsPerMinute(): number {
+    return this.config.pixelsPerMinute;
+  }
+
+  getStartMs(): number {
+    return this.config.startMs;
+  }
+
+  getEndMs(): number {
+    return this.config.endMs;
+  }
+
   getTotalWidth(): number {
     return this.totalMinutes * this.config.pixelsPerMinute;
   }

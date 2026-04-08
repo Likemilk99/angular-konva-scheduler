@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component } from '@angular/core';
 import { map } from 'rxjs/operators';
 import { SchedulerStateService } from '../../../services/scheduler-state.service';
+import { EventDragResult } from '../../renderers/timeline-konva-renderer';
 
 @Component({
   selector: 'app-scheduler-page',
@@ -29,5 +30,15 @@ export class SchedulerPageComponent {
 
   toggleUpdates(): void {
     this.state.toggleUpdatesPaused();
+  }
+
+  handleEventDragged(drag: EventDragResult): void {
+    if (drag.mode === 'assignment' && drag.rowId) {
+      this.state.updateEventRow(drag.eventId, drag.rowId);
+      return;
+    }
+    if (drag.mode === 'time' && drag.startDateTime && drag.endDateTime) {
+      this.state.shiftEventTime(drag.eventId, drag.startDateTime, drag.endDateTime);
+    }
   }
 }

@@ -45,6 +45,26 @@ export class SchedulerStateService implements OnDestroy {
     this.stateSubject.next({ ...current, updatesPaused: !current.updatesPaused });
   }
 
+  updateEventRow(eventId: string, rowId: string): void {
+    const current = this.stateSubject.value;
+    const updatedEvents = current.events.map((event) => (event.id === eventId ? { ...event, rowId } : event));
+    this.stateSubject.next({ ...current, events: updatedEvents });
+  }
+
+  shiftEventTime(eventId: string, startDateTime: string, endDateTime: string): void {
+    const current = this.stateSubject.value;
+    const updatedEvents = current.events.map((event) =>
+      event.id === eventId
+        ? {
+            ...event,
+            startDateTime,
+            endDateTime
+          }
+        : event
+    );
+    this.stateSubject.next({ ...current, events: updatedEvents });
+  }
+
   private startRealtimeUpdates(): void {
     this.zone.runOutsideAngular(() => {
       this.realtimeSub = interval(4000).subscribe(() => {

@@ -3,15 +3,18 @@ import {
   ChangeDetectionStrategy,
   Component,
   ElementRef,
+  EventEmitter,
+  HostListener,
   Input,
   NgZone,
   OnChanges,
   OnDestroy,
+  Output,
   SimpleChanges,
   ViewChild
 } from '@angular/core';
 import { Driver, HOLD_ROW_ID, SchedulerEvent, Shift, TimelineWindow } from '../../../models/timeline.models';
-import { TimelineKonvaRenderer } from '../../renderers/timeline-konva-renderer';
+import { EventDragResult, TimelineKonvaRenderer } from '../../renderers/timeline-konva-renderer';
 import { TimelineScale } from '../../utils/timeline-scale';
 
 @Component({
@@ -26,11 +29,14 @@ export class TimelineCanvasComponent implements AfterViewInit, OnChanges, OnDest
   @Input() shifts: Shift[] = [];
   @Input() timelineWindow!: TimelineWindow;
   @Input() rowHeight = 54;
+  @Output() eventDragged = new EventEmitter<EventDragResult>();
 
   @ViewChild('canvasHost') canvasHost?: ElementRef<HTMLDivElement>;
 
   timelineWidth = 960;
   timelineHeight = 300;
+  private ctrlPressed = false;
+  private initialized = false;
 
   private readonly renderer = new TimelineKonvaRenderer();
 
@@ -46,6 +52,17 @@ export class TimelineCanvasComponent implements AfterViewInit, OnChanges, OnDest
 
   ngOnDestroy(): void {
     this.renderer.destroy();
+    this.initialized = false;
+  }
+
+  @HostListener('window:keydown.control')
+  onCtrlDown(): void {
+    this.ctrlPressed = true;
+  }
+
+  @HostListener('window:keyup.control')
+  onCtrlUp(): void {
+    this.ctrlPressed = false;
   }
 
   private render(): void {
@@ -67,13 +84,16 @@ export class TimelineCanvasComponent implements AfterViewInit, OnChanges, OnDest
     this.timelineHeight = height;
 
     this.zone.runOutsideAngular(() => {
-      this.renderer.initialize({
-        container: this.canvasHost?.nativeElement as HTMLDivElement,
-        width,
-        rowHeight: this.rowHeight,
-        headerHeight: 40,
-        scale
-      });
+      if (!this.initialized) {
+        this.renderer.initialize({
+          container: this.canvasHost?.nativeElement as HTMLDivElement,
+          width,
+          rowHeight: this.rowHeight,
+          headerHeight: 40,
+          scale
+        });
+        this.initialized = true;
+      }
       this.renderer.render({
         rowHeight: this.rowHeight,
         headerHeight: 40,
@@ -82,7 +102,9 @@ export class TimelineCanvasComponent implements AfterViewInit, OnChanges, OnDest
         drivers: this.drivers,
         shifts: this.shifts,
         events: this.events,
-        scale
+        scale,
+        onDragCommit: (drag) => this.zone.run(() => this.eventDragged.emit(drag)),
+        isCtrlPressed: () => this.ctrlPressed
       });
     });
   }
