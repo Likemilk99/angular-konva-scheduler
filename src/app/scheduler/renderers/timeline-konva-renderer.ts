@@ -164,7 +164,7 @@ export class TimelineKonvaRenderer {
     this.rowBackgroundRects.clear();
 
     this.drawGrid(args.rows, args.rowHeight, args.headerHeight, args.timelineWidth);
-    this.drawHourTicks(args.scale, args.headerHeight, args.timelineWidth);
+    this.drawTimelineTicks(args.scale, args.headerHeight, args.timelineWidth);
     this.drawShifts(args, args.rowHeight, args.headerHeight);
 
     this.gridLayer.draw();
@@ -274,17 +274,17 @@ export class TimelineKonvaRenderer {
     });
   }
 
-  private drawHourTicks(scale: TimelineScale, headerHeight: number, width: number): void {
+  private drawTimelineTicks(scale: TimelineScale, headerHeight: number, width: number): void {
     if (!this.gridLayer || !this.stage) {
       return;
     }
 
-    const pixelsPerMinute = scale.getPixelsPerMinute();
-    const hourWidth = Math.max(1, 60 * pixelsPerMinute);
-    const totalHours = Math.ceil(width / hourWidth);
+    const tickIntervalMinutes = scale.getTickIntervalMinutes();
+    const totalMinutes = scale.getTotalMinutes();
+    const totalTicks = Math.ceil(totalMinutes / tickIntervalMinutes);
 
-    for (let hour = 0; hour <= totalHours; hour += 1) {
-      const x = hour * hourWidth;
+    for (let i = 0; i <= totalTicks; i += 1) {
+      const x = (i * tickIntervalMinutes * scale.getPixelsPerHour()) / 60;
       this.gridLayer.add(
         new Konva.Line({
           points: [x, 0, x, this.stage.height()],
@@ -294,7 +294,7 @@ export class TimelineKonvaRenderer {
         })
       );
 
-      const labelDate = new Date(scale.xToDateTime(x));
+      const labelDate = new Date(scale.xToTime(x));
       this.gridLayer.add(
         new Konva.Text({
           x: x + 4,

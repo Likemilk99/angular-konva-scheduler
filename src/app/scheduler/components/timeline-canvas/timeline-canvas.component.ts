@@ -13,7 +13,7 @@ import {
   SimpleChanges,
   ViewChild
 } from '@angular/core';
-import { Driver, HOLD_ROW_ID, SchedulerEvent, Shift, TimelineWindow } from '../../../models/timeline.models';
+import { Driver, HOLD_ROW_ID, SchedulerEvent, Shift, TimelineWindow, ZoomLevel } from '../../../models/timeline.models';
 import { EventDragResult, TimelineKonvaRenderer } from '../../renderers/timeline-konva-renderer';
 import { TimelineScale } from '../../utils/timeline-scale';
 
@@ -31,6 +31,7 @@ export class TimelineCanvasComponent implements AfterViewInit, OnChanges, OnDest
   @Input() events: SchedulerEvent[] = [];
   @Input() shifts: Shift[] = [];
   @Input() timelineWindow!: TimelineWindow;
+  @Input() zoomLevel: ZoomLevel = 60;
   @Input() rowHeight = 54;
   @Output() eventDragged = new EventEmitter<EventDragResult>();
 
@@ -78,9 +79,10 @@ export class TimelineCanvasComponent implements AfterViewInit, OnChanges, OnDest
       startMs: new Date(this.timelineWindow.startDateTime).getTime(),
       endMs: new Date(this.timelineWindow.endDateTime).getTime(),
       pixelsPerMinute: TimelineCanvasComponent.PIXELS_PER_MINUTE
+      zoomLevel: this.zoomLevel
     });
 
-    const width = scale.getTotalWidth() + 120;
+    const width = scale.getTotalWidth();
     const height = TimelineCanvasComponent.HEADER_HEIGHT + rows.length * this.rowHeight;
 
     this.timelineWidth = width;

@@ -1,6 +1,7 @@
 import { Injectable, NgZone, OnDestroy } from '@angular/core';
 import { BehaviorSubject, interval, Subscription } from 'rxjs';
 import { Driver, HOLD_ROW_ID, SchedulerEvent, SchedulerState, Shift } from '../models/timeline.models';
+import { getZoomInLevel, getZoomOutLevel } from '../scheduler/utils/timeline-zoom';
 import { MockDataService } from './mock-data.service';
 
 const EMPTY_STATE: SchedulerState = {
@@ -12,7 +13,8 @@ const EMPTY_STATE: SchedulerState = {
     startDateTime: new Date().toISOString(),
     endDateTime: new Date().toISOString()
   },
-  updatesPaused: false
+  updatesPaused: false,
+  zoomLevel: 60
 };
 
 @Injectable({ providedIn: 'root' })
@@ -36,13 +38,26 @@ export class SchedulerStateService implements OnDestroy {
 
     setTimeout(() => {
       const dataset = this.mockData.createDataset();
-      this.stateSubject.next({ ...dataset, loading: false, updatesPaused: this.stateSubject.value.updatesPaused });
+      this.stateSubject.next({
+        ...dataset,
+        loading: false,
+        updatesPaused: this.stateSubject.value.updatesPaused,
+        zoomLevel: this.stateSubject.value.zoomLevel
+      });
     }, 900);
   }
 
   toggleUpdatesPaused(): void {
     const current = this.stateSubject.value;
     this.stateSubject.next({ ...current, updatesPaused: !current.updatesPaused });
+  }
+
+  zoomIn(): void {
+    this.updateZoomByStep(1);
+  }
+
+  zoomOut(): void {
+    this.updateZoomByStep(-1);
   }
 
   updateEventRow(eventId: string, rowId: string): void {
@@ -113,5 +128,15 @@ export class SchedulerStateService implements OnDestroy {
     const statuses: SchedulerEvent['status'][] = ['normal', 'warning', 'delayed', 'conflict', 'locked'];
     const filtered = statuses.filter((status) => status !== current);
     return filtered[Math.floor(Math.random() * filtered.length)] ?? current;
+  }
+
+  private updateZoomByStep(direction: 1 | -1): void {
+    const current = this.stateSubject.value;
+    const nextLevel = direction === 1 ? getZoomInLevel(current.zoomLevel) : getZoomOutLevel(current.zoomLevel);
+    if (!nextLevel) {
+      return;
+    }
+
+    this.stateSubject.next({ ...current, zoomLevel: nextLevel });
   }
 }
