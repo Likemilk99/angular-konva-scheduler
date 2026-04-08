@@ -100,19 +100,18 @@ export class SchedulerPageComponent implements AfterViewInit {
     }
 
     requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        const startMs = new Date(vm.timelineWindow.startDateTime).getTime();
-        const endMs = new Date(vm.timelineWindow.endDateTime).getTime();
-        const safeCenterTimeMs = Math.min(Math.max(this.pendingCenterTimeMs ?? startMs, startMs), endMs);
-        const minutesFromStart = (safeCenterTimeMs - startMs) / 60000;
-        const pixelsPerMinute = getTimelineZoomConfig(vm.settings.zoomLevel).pixelsPerHour / 60;
-        const targetCenterX = minutesFromStart * pixelsPerMinute;
-        const maxScrollLeft = Math.max(0, container.scrollWidth - container.clientWidth);
-        const targetScrollLeft = Math.min(Math.max(0, targetCenterX - container.clientWidth / 2), maxScrollLeft);
-        container.scrollLeft = targetScrollLeft;
-        this.pendingCenterTimeMs = undefined;
-      });
+      const startMs = new Date(vm.timelineWindow.startDateTime).getTime();
+      const endMs = new Date(vm.timelineWindow.endDateTime).getTime();
+      const safeCenterTimeMs = Math.min(Math.max(this.pendingCenterTimeMs ?? startMs, startMs), endMs);
+      const minutesFromStart = (safeCenterTimeMs - startMs) / 60000;
+      const pixelsPerMinute = getTimelineZoomConfig(vm.settings.zoomLevel).pixelsPerHour / 60;
+      const targetCenterX = minutesFromStart * pixelsPerMinute;
+      const maxScrollLeft = Math.max(0, container.scrollWidth - container.clientWidth);
+      const targetScrollLeft = Math.min(Math.max(0, targetCenterX - container.clientWidth / 2), maxScrollLeft);
+      container.scrollLeft = targetScrollLeft;
+      this.pendingCenterTimeMs = undefined;
     });
+
   }
 
   handleEventDragged(drag: EventDragResult): void {

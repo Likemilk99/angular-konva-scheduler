@@ -25,9 +25,9 @@ export class MockDataService {
     timelineWindow: TimelineWindow;
   } {
     const resolvedWindow = timelineWindow ?? this.createTimelineWindow();
-    const drivers = this.createDrivers(30);
+    const drivers = this.createDrivers(100);
     const shifts = this.createShifts(drivers, resolvedWindow);
-    const events = this.createEvents(drivers, resolvedWindow, 200);
+    const events = this.createEvents(drivers, resolvedWindow, 5000);
 
     return { drivers, shifts, events, timelineWindow: resolvedWindow };
   }
