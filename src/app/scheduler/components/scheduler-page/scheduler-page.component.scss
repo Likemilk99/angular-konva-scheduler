@@ -1,0 +1,30 @@
+:host {
+  display: block;
+  height: 100%;
+}
+
+.scheduler-page {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.loading {
+  padding: 18px;
+  font-size: 14px;
+}
+
+.board-scroll {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  overflow-y: auto;
+  border-top: 1px solid #e2e8f0;
+}
+
+.timeline-scroll {
+  flex: 1;
+  overflow-x: auto;
+  overflow-y: hidden;
+  background: #f8fafc;
+}
