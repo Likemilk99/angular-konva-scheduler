@@ -65,6 +65,8 @@ export class TimelineCanvasComponent implements AfterViewInit, OnChanges, OnDest
   private ctrlPressed = false;
   private initialized = false;
   private hoveredEventId?: string;
+  private hoverRafId?: number;
+  private pendingHoverPayload?: EventHoverPayload;
   private renderRafId?: number;
   private destroyed = false;
   private lastMeasuredWidth = 0;
@@ -91,6 +93,10 @@ export class TimelineCanvasComponent implements AfterViewInit, OnChanges, OnDest
     if (this.renderRafId) {
       cancelAnimationFrame(this.renderRafId);
       this.renderRafId = undefined;
+    }
+    if (this.hoverRafId) {
+      cancelAnimationFrame(this.hoverRafId);
+      this.hoverRafId = undefined;
     }
     this.renderer.destroy();
     this.initialized = false;
@@ -179,7 +185,7 @@ export class TimelineCanvasComponent implements AfterViewInit, OnChanges, OnDest
       formatTime: (isoDateTime) => this.timeService.formatTime(isoDateTime, this.timeZone),
       formatDate: (isoDateTime) => this.timeService.formatShortDate(isoDateTime, this.timeZone),
       onDragCommit: (drag) => this.zone.run(() => this.eventDragged.emit(drag)),
-      onEventHover: (payload) => this.zone.run(() => this.updateTooltip(payload)),
+      onEventHover: (payload) => this.queueTooltipUpdate(payload),
       onEventHoverEnd: () => this.zone.run(() => this.hideTooltip()),
       isCtrlPressed: () => this.ctrlPressed
     });
@@ -198,6 +204,13 @@ export class TimelineCanvasComponent implements AfterViewInit, OnChanges, OnDest
   private updateTooltip(payload: EventHoverPayload): void {
     const x = this.clamp(payload.x + 14, 8, Math.max(8, this.timelineWidth - TimelineCanvasComponent.TOOLTIP_WIDTH));
     const y = this.clamp(payload.y + 14, 8, Math.max(8, this.timelineHeight - TimelineCanvasComponent.TOOLTIP_HEIGHT));
+    if (this.hoveredEventId === payload.event.id && this.tooltipState.visible) {
+      const deltaX = Math.abs(this.tooltipState.x - x);
+      const deltaY = Math.abs(this.tooltipState.y - y);
+      if (deltaX < 3 && deltaY < 3) {
+        return;
+      }
+    }
     this.hoveredEventId = payload.event.id;
     this.tooltipState = {
       visible: true,
@@ -206,6 +219,23 @@ export class TimelineCanvasComponent implements AfterViewInit, OnChanges, OnDest
       event: payload.event
     };
     this.cdr.markForCheck();
+  }
+
+  private queueTooltipUpdate(payload: EventHoverPayload): void {
+    this.pendingHoverPayload = payload;
+    if (this.hoverRafId) {
+      return;
+    }
+
+    this.hoverRafId = requestAnimationFrame(() => {
+      this.hoverRafId = undefined;
+      const nextPayload = this.pendingHoverPayload;
+      this.pendingHoverPayload = undefined;
+      if (!nextPayload) {
+        return;
+      }
+      this.zone.run(() => this.updateTooltip(nextPayload));
+    });
   }
 
   private hideTooltip(): void {
