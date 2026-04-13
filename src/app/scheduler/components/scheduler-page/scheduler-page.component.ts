@@ -1,9 +1,24 @@
-import { AfterViewInit, ChangeDetectionStrategy, Component, ElementRef, ViewChild } from '@angular/core';
+import {
+  AfterViewInit,
+  ChangeDetectionStrategy,
+  ChangeDetectorRef,
+  Component,
+  ElementRef,
+  HostListener,
+  OnDestroy,
+  ViewChild
+} from '@angular/core';
 import { map, tap } from 'rxjs/operators';
 import { Driver, SchedulerEvent, SchedulerSettings, Shift, TimelineWindow } from '../../../models/timeline.models';
 import { SchedulerStateService } from '../../../services/scheduler-state.service';
 import { EventDragResult } from '../../renderers/timeline-konva-renderer';
 import { getTimelineZoomConfig } from '../../utils/timeline-zoom';
+import {
+  computeVisibleRowRange,
+  ViewportState,
+  VisibleRowRange,
+  VIRTUALIZATION_OVERSCAN
+} from '../../utils/viewport-virtualization';
 
 interface SchedulerPageVm {
   loading: boolean;
@@ -21,12 +36,21 @@ interface SchedulerPageVm {
   styleUrls: ['./scheduler-page.component.scss'],
   changeDetection: ChangeDetectionStrategy.OnPush
 })
-export class SchedulerPageComponent implements AfterViewInit {
+export class SchedulerPageComponent implements AfterViewInit, OnDestroy {
   @ViewChild('timelineScroll') timelineScroll?: ElementRef<HTMLDivElement>;
+  @ViewChild('boardScroll') boardScroll?: ElementRef<HTMLDivElement>;
 
   readonly rowHeight = 54;
+  readonly headerHeight = 40;
+  readonly verticalOverscanRows = VIRTUALIZATION_OVERSCAN.verticalRows;
+
+  viewport: ViewportState = { scrollLeft: 0, scrollTop: 0, viewportWidth: 0, viewportHeight: 0 };
+  visibleRowRange: VisibleRowRange = { startIndex: 0, endIndex: 0 };
+
   private latestVm?: SchedulerPageVm;
   private pendingCenterTimeMs?: number;
+  private rafHandle?: number;
+
   settingsOpen = false;
 
   readonly vm$ = this.state.state$.pipe(
@@ -42,14 +66,22 @@ export class SchedulerPageComponent implements AfterViewInit {
     tap((vm) => {
       this.latestVm = vm;
       this.restoreCenterAfterSettings(vm);
+      this.recomputeViewport(vm.drivers.length + 1);
     })
   );
 
-  constructor(private readonly state: SchedulerStateService) {}
+  constructor(private readonly state: SchedulerStateService, private readonly cdr: ChangeDetectorRef) {}
 
   ngAfterViewInit(): void {
     if (this.pendingCenterTimeMs && this.latestVm) {
       this.restoreCenterAfterSettings(this.latestVm);
+    }
+    this.recomputeViewport((this.latestVm?.drivers.length ?? 0) + 1);
+  }
+
+  ngOnDestroy(): void {
+    if (this.rafHandle) {
+      cancelAnimationFrame(this.rafHandle);
     }
   }
 
@@ -73,6 +105,47 @@ export class SchedulerPageComponent implements AfterViewInit {
     this.captureVisibleCenterTime();
     this.state.updateSettings(settings);
     this.settingsOpen = false;
+  }
+
+  onScroll(): void {
+    if (this.rafHandle) {
+      return;
+    }
+
+    this.rafHandle = requestAnimationFrame(() => {
+      this.rafHandle = undefined;
+      this.recomputeViewport((this.latestVm?.drivers.length ?? 0) + 1);
+    });
+  }
+
+  @HostListener('window:resize')
+  onResize(): void {
+    this.recomputeViewport((this.latestVm?.drivers.length ?? 0) + 1);
+  }
+
+  private recomputeViewport(rowCount: number): void {
+    const board = this.boardScroll?.nativeElement;
+    const timeline = this.timelineScroll?.nativeElement;
+    if (!board || !timeline) {
+      return;
+    }
+
+    this.viewport = {
+      scrollLeft: timeline.scrollLeft,
+      scrollTop: board.scrollTop,
+      viewportWidth: timeline.clientWidth,
+      viewportHeight: board.clientHeight
+    };
+
+    this.visibleRowRange = computeVisibleRowRange({
+      viewport: this.viewport,
+      rowHeight: this.rowHeight,
+      rowCount,
+      headerHeight: this.headerHeight,
+      overscanRows: this.verticalOverscanRows
+    });
+
+    this.cdr.markForCheck();
   }
 
   private captureVisibleCenterTime(): void {
@@ -110,8 +183,8 @@ export class SchedulerPageComponent implements AfterViewInit {
       const targetScrollLeft = Math.min(Math.max(0, targetCenterX - container.clientWidth / 2), maxScrollLeft);
       container.scrollLeft = targetScrollLeft;
       this.pendingCenterTimeMs = undefined;
+      this.recomputeViewport(vm.drivers.length + 1);
     });
-
   }
 
   handleEventDragged(drag: EventDragResult): void {
