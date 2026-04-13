@@ -44,6 +44,7 @@ interface RendererEventNode {
   event: SchedulerEvent;
   model: EventVisualModel;
   group: Konva.Group;
+  textNodes: Konva.Text[];
 }
 
 interface RendererShiftNode {
@@ -87,6 +88,8 @@ export class TimelineKonvaRenderer {
   private onEventHover?: (payload: EventHoverPayload) => void;
   private onEventHoverEnd?: () => void;
   private isCtrlPressed?: () => boolean;
+  private hoverRafId?: number;
+  private pendingHoverEvent?: SchedulerEvent;
 
   private timeZone = 'UTC';
   private formatTime: (isoDateTime: string) => string = (isoDateTime) => new Date(isoDateTime).toISOString();
@@ -190,6 +193,11 @@ export class TimelineKonvaRenderer {
     this.initializedContainer = undefined;
     this.dragPreview?.destroy();
     this.dragPreview = undefined;
+    if (this.hoverRafId) {
+      cancelAnimationFrame(this.hoverRafId);
+      this.hoverRafId = undefined;
+    }
+    this.pendingHoverEvent = undefined;
   }
 
   private reconcileGrid(
@@ -406,9 +414,9 @@ export class TimelineKonvaRenderer {
 
       const existing = this.eventNodes.get(event.id);
       if (!existing) {
-        const group = this.createEventGroup(model, event.id);
-        eventLayer.add(group);
-        this.eventNodes.set(event.id, { event, model, group });
+        const created = this.createEventGroup(model, event.id);
+        eventLayer.add(created.group);
+        this.eventNodes.set(event.id, { event, model, group: created.group, textNodes: created.textNodes });
         return;
       }
 
@@ -421,7 +429,7 @@ export class TimelineKonvaRenderer {
 
       if (!this.isSameEventModel(existing.model, model)) {
         existing.model = model;
-        this.updateEventGroup(existing.group, model);
+        this.updateEventGroup(existing, model);
       }
     });
 
@@ -488,7 +496,7 @@ export class TimelineKonvaRenderer {
     );
   }
 
-  private createEventGroup(model: EventVisualModel, eventId: string): Konva.Group {
+  private createEventGroup(model: EventVisualModel, eventId: string): { group: Konva.Group; textNodes: Konva.Text[] } {
     const group = new Konva.Group({ id: model.id, x: model.x, y: model.y, draggable: true });
 
     group.dragBoundFunc((pos) => this.getBoundedPosition(eventId, pos));
@@ -522,25 +530,26 @@ export class TimelineKonvaRenderer {
     });
     group.add(tail);
 
-    model.lines.forEach((line, index) => {
-      group.add(
-        new Konva.Text({
-          name: `event-line-${index}`,
-          x: 8,
-          y: 5 + index * 14,
-          width: model.width - 12,
-          text: line,
-          fontSize: 11,
-          fill: '#0f172a',
-          ellipsis: true
-        })
-      );
+    const textNodes = model.lines.map((line, index) => {
+      const textNode = new Konva.Text({
+        name: `event-line-${index}`,
+        x: 8,
+        y: 5 + index * 14,
+        width: model.width - 12,
+        text: line,
+        fontSize: 11,
+        fill: '#0f172a',
+        ellipsis: true
+      });
+      group.add(textNode);
+      return textNode;
     });
 
-    return group;
+    return { group, textNodes };
   }
 
-  private updateEventGroup(group: Konva.Group, model: EventVisualModel): void {
+  private updateEventGroup(node: RendererEventNode, model: EventVisualModel): void {
+    const group = node.group;
     group.position({ x: model.x, y: model.y });
 
     const bodyRect = group.findOne<Konva.Rect>('.event-body');
@@ -558,20 +567,32 @@ export class TimelineKonvaRenderer {
       stroke: model.accentColor
     });
 
-    group.find('Text').forEach((textNode) => textNode.destroy());
-    model.lines.forEach((line, index) => {
-      group.add(
-        new Konva.Text({
-          name: `event-line-${index}`,
-          x: 8,
-          y: 5 + index * 14,
-          width: model.width - 12,
-          text: line,
-          fontSize: 11,
-          fill: '#0f172a',
-          ellipsis: true
-        })
-      );
+    while (node.textNodes.length > model.lines.length) {
+      node.textNodes.pop()?.destroy();
+    }
+
+    while (node.textNodes.length < model.lines.length) {
+      const nextIndex = node.textNodes.length;
+      const textNode = new Konva.Text({
+        name: `event-line-${nextIndex}`,
+        x: 8,
+        y: 5 + nextIndex * 14,
+        width: model.width - 12,
+        text: '',
+        fontSize: 11,
+        fill: '#0f172a',
+        ellipsis: true
+      });
+      group.add(textNode);
+      node.textNodes.push(textNode);
+    }
+
+    node.textNodes.forEach((textNode, index) => {
+      textNode.setAttrs({
+        y: 5 + index * 14,
+        width: model.width - 12,
+        text: model.lines[index] ?? ''
+      });
     });
   }
 
@@ -725,16 +746,35 @@ export class TimelineKonvaRenderer {
     });
 
     this.onEventHoverEnd?.();
+    this.pendingHoverEvent = undefined;
+    if (this.hoverRafId) {
+      cancelAnimationFrame(this.hoverRafId);
+      this.hoverRafId = undefined;
+    }
     this.eventLayer?.batchDraw();
   }
 
   private emitHover(event: SchedulerEvent): void {
-    const pointer = this.stage?.getPointerPosition();
-    if (!pointer) {
+    this.pendingHoverEvent = event;
+    if (this.hoverRafId) {
       return;
     }
 
-    this.onEventHover?.({ event, x: pointer.x, y: pointer.y });
+    this.hoverRafId = requestAnimationFrame(() => {
+      this.hoverRafId = undefined;
+      const nextEvent = this.pendingHoverEvent;
+      this.pendingHoverEvent = undefined;
+      if (!nextEvent) {
+        return;
+      }
+
+      const pointer = this.stage?.getPointerPosition();
+      if (!pointer) {
+        return;
+      }
+
+      this.onEventHover?.({ event: nextEvent, x: pointer.x, y: pointer.y });
+    });
   }
 
   private getBoundedPosition(eventId: string, pos: Konva.Vector2d): Konva.Vector2d {
