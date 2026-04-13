@@ -286,11 +286,34 @@ export class TimelineKonvaRenderer {
 
     const tickIntervalMinutes = scale.getTickIntervalMinutes();
     const tickWidth = (tickIntervalMinutes * scale.getPixelsPerHour()) / 60;
+    if (!Number.isFinite(tickWidth) || tickWidth <= 0) {
+      this.tickNodes.forEach((node) => {
+        node.line.destroy();
+        node.timeText.destroy();
+        node.dateText.destroy();
+      });
+      this.tickNodes.clear();
+      return;
+    }
+
     const firstTick = Math.floor(visibleTimeRange.startX / tickWidth);
     const lastTick = Math.ceil(visibleTimeRange.endX / tickWidth);
+    if (!Number.isFinite(firstTick) || !Number.isFinite(lastTick) || lastTick < firstTick) {
+      this.tickNodes.forEach((node) => {
+        node.line.destroy();
+        node.timeText.destroy();
+        node.dateText.destroy();
+      });
+      this.tickNodes.clear();
+      return;
+    }
+
+    const requestedTickCount = lastTick - firstTick + 1;
+    const maxRenderedTicks = 2500;
+    const tickStep = requestedTickCount > maxRenderedTicks ? Math.ceil(requestedTickCount / maxRenderedTicks) : 1;
 
     const targetTickIndexes = new Set<number>();
-    for (let tickIndex = firstTick; tickIndex <= lastTick; tickIndex += 1) {
+    for (let tickIndex = firstTick; tickIndex <= lastTick; tickIndex += tickStep) {
       targetTickIndexes.add(tickIndex);
 
       const x = tickIndex * tickWidth;
