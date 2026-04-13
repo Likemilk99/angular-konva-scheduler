@@ -20,11 +20,11 @@ import { EventDragResult, EventHoverPayload, TimelineKonvaRenderer } from '../..
 import { TimelineScale } from '../../utils/timeline-scale';
 import {
   computeVisibleTimeRange,
-  filterTimelineItemsByViewport,
   toVisibleRowIds,
   ViewportState,
   VisibleRowRange,
-  VIRTUALIZATION_OVERSCAN
+  VIRTUALIZATION_OVERSCAN,
+  rangesIntersect
 } from '../../utils/viewport-virtualization';
 
 @Component({
@@ -73,6 +73,12 @@ export class TimelineCanvasComponent implements AfterViewInit, OnChanges, OnDest
   private lastMeasuredHeight = 0;
 
   private readonly renderer = new TimelineKonvaRenderer();
+  private indexedEventsRef?: SchedulerEvent[];
+  private indexedShiftsRef?: Shift[];
+  private readonly eventsByRow = new Map<string, SchedulerEvent[]>();
+  private readonly shiftsByRow = new Map<string, Shift[]>();
+  private readonly eventTimeCache = new Map<string, { startDateTime: string; endDateTime: string; startMs: number; endMs: number }>();
+  private readonly shiftTimeCache = new Map<string, { startDateTime: string; endDateTime: string; startMs: number; endMs: number }>();
 
   constructor(
     private readonly zone: NgZone,
@@ -151,12 +157,8 @@ export class TimelineCanvasComponent implements AfterViewInit, OnChanges, OnDest
       overscanPx: TimelineCanvasComponent.HORIZONTAL_OVERSCAN_PX
     });
 
-    const filteredItems = filterTimelineItemsByViewport({
-      events: this.events,
-      shifts: this.shifts,
-      visibleRowIds,
-      visibleTimeRange
-    });
+    this.ensureRowIndexes();
+    const filteredItems = this.filterIndexedItems(visibleRowIds, visibleTimeRange.startMs, visibleTimeRange.endMs);
 
     if (!this.initialized) {
       this.renderer.initialize({
@@ -249,5 +251,98 @@ export class TimelineCanvasComponent implements AfterViewInit, OnChanges, OnDest
 
   private clamp(value: number, min: number, max: number): number {
     return Math.min(max, Math.max(min, value));
+  }
+
+  private ensureRowIndexes(): void {
+    if (this.indexedEventsRef !== this.events) {
+      this.indexedEventsRef = this.events;
+      this.rebuildEventIndex(this.events);
+    }
+
+    if (this.indexedShiftsRef !== this.shifts) {
+      this.indexedShiftsRef = this.shifts;
+      this.rebuildShiftIndex(this.shifts);
+    }
+  }
+
+  private rebuildEventIndex(events: SchedulerEvent[]): void {
+    this.eventsByRow.clear();
+    for (const event of events) {
+      const list = this.eventsByRow.get(event.rowId);
+      if (list) {
+        list.push(event);
+      } else {
+        this.eventsByRow.set(event.rowId, [event]);
+      }
+    }
+  }
+
+  private rebuildShiftIndex(shifts: Shift[]): void {
+    this.shiftsByRow.clear();
+    for (const shift of shifts) {
+      const list = this.shiftsByRow.get(shift.driverId);
+      if (list) {
+        list.push(shift);
+      } else {
+        this.shiftsByRow.set(shift.driverId, [shift]);
+      }
+    }
+  }
+
+  private filterIndexedItems(visibleRowIds: Set<string>, startMs: number, endMs: number): { events: SchedulerEvent[]; shifts: Shift[] } {
+    const visibleEvents: SchedulerEvent[] = [];
+    const visibleShifts: Shift[] = [];
+
+    visibleRowIds.forEach((rowId) => {
+      const rowEvents = this.eventsByRow.get(rowId) ?? [];
+      for (const event of rowEvents) {
+        const timing = this.getEventTiming(event);
+        if (rangesIntersect(timing.startMs, timing.endMs, startMs, endMs)) {
+          visibleEvents.push(event);
+        }
+      }
+
+      const rowShifts = this.shiftsByRow.get(rowId) ?? [];
+      for (const shift of rowShifts) {
+        const timing = this.getShiftTiming(shift);
+        if (rangesIntersect(timing.startMs, timing.endMs, startMs, endMs)) {
+          visibleShifts.push(shift);
+        }
+      }
+    });
+
+    return { events: visibleEvents, shifts: visibleShifts };
+  }
+
+  private getEventTiming(event: SchedulerEvent): { startMs: number; endMs: number } {
+    const cached = this.eventTimeCache.get(event.id);
+    if (cached && cached.startDateTime === event.startDateTime && cached.endDateTime === event.endDateTime) {
+      return cached;
+    }
+
+    const next = {
+      startDateTime: event.startDateTime,
+      endDateTime: event.endDateTime,
+      startMs: new Date(event.startDateTime).getTime(),
+      endMs: new Date(event.endDateTime).getTime()
+    };
+    this.eventTimeCache.set(event.id, next);
+    return next;
+  }
+
+  private getShiftTiming(shift: Shift): { startMs: number; endMs: number } {
+    const cached = this.shiftTimeCache.get(shift.id);
+    if (cached && cached.startDateTime === shift.startDateTime && cached.endDateTime === shift.endDateTime) {
+      return cached;
+    }
+
+    const next = {
+      startDateTime: shift.startDateTime,
+      endDateTime: shift.endDateTime,
+      startMs: new Date(shift.startDateTime).getTime(),
+      endMs: new Date(shift.endDateTime).getTime()
+    };
+    this.shiftTimeCache.set(shift.id, next);
+    return next;
   }
 }
