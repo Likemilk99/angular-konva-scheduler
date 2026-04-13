@@ -34,6 +34,7 @@ const EMPTY_STATE: SchedulerState = {
 @Injectable({ providedIn: 'root' })
 export class SchedulerStateService implements OnDestroy {
   private readonly initialSettings = this.loadSettings();
+  private eventIndexById = new Map<string, number>();
 
   private readonly stateSubject = new BehaviorSubject<SchedulerState>({
     ...EMPTY_STATE,
@@ -60,6 +61,7 @@ export class SchedulerStateService implements OnDestroy {
     setTimeout(() => {
       const current = this.stateSubject.value;
       const dataset = this.mockData.createDataset(current.settings.visibleWindow);
+      this.rebuildEventIndex(dataset.events);
       this.stateSubject.next({
         ...dataset,
         loading: false,
@@ -89,26 +91,35 @@ export class SchedulerStateService implements OnDestroy {
   }
 
   updateEventRow(eventId: string, rowId: string): void {
-    this.updateEvents((event) => (event.id === eventId ? { ...event, rowId } : event));
+    this.patchEventById(eventId, (event) => ({ ...event, rowId }));
   }
 
   shiftEventTime(eventId: string, startDateTime: string, endDateTime: string): void {
-    this.updateEvents((event) =>
-      event.id === eventId
-        ? {
-            ...event,
-            startDateTime,
-            endDateTime
-          }
-        : event
-    );
+    this.patchEventById(eventId, (event) => ({
+      ...event,
+      startDateTime,
+      endDateTime
+    }));
   }
 
-  private updateEvents(mapper: (event: SchedulerEvent) => SchedulerEvent): void {
+  private patchEventById(eventId: string, patcher: (event: SchedulerEvent) => SchedulerEvent): void {
     const current = this.stateSubject.value;
+    const eventIndex = this.eventIndexById.get(eventId) ?? current.events.findIndex((event) => event.id === eventId);
+    if (eventIndex < 0 || eventIndex >= current.events.length) {
+      return;
+    }
+
+    const target = current.events[eventIndex];
+    const patched = patcher(target);
+    if (patched === target) {
+      return;
+    }
+
+    const nextEvents = current.events.slice();
+    nextEvents[eventIndex] = patched;
     this.stateSubject.next({
       ...current,
-      events: current.events.map(mapper)
+      events: nextEvents
     });
   }
 
@@ -141,10 +152,18 @@ export class SchedulerStateService implements OnDestroy {
         }
 
         updatedEvents[eventIndex] = target;
+        this.eventIndexById.set(target.id, eventIndex);
         this.zone.run(() => {
           this.stateSubject.next({ ...snapshot, events: updatedEvents });
         });
       });
+    });
+  }
+
+  private rebuildEventIndex(events: SchedulerEvent[]): void {
+    this.eventIndexById.clear();
+    events.forEach((event, index) => {
+      this.eventIndexById.set(event.id, index);
     });
   }
 
